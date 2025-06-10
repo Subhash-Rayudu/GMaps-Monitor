@@ -18,13 +18,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const settings = await storage.getSettings();
       const activeRoutes = await storage.getActiveRoutes();
       
+      // Use environment variable for API key if available, otherwise fallback to settings
+      const apiKey = process.env.GOOGLE_MAPS_API_KEY || settings?.apiKey;
+      
+      // Update settings with environment API key if it exists
+      if (process.env.GOOGLE_MAPS_API_KEY && (!settings?.apiKey || settings.apiKey !== process.env.GOOGLE_MAPS_API_KEY)) {
+        await storage.updateSettings({ apiKey: process.env.GOOGLE_MAPS_API_KEY });
+      }
+      
       // Schedule monitoring for active routes
       for (const route of activeRoutes) {
         scheduleRouteMonitoring(route.id);
       }
       
       return res.json({
-        apiKeyConfigured: !!settings?.apiKey,
+        apiKeyConfigured: !!apiKey,
         activeRoutesCount: activeRoutes.length,
       });
     } catch (error) {
@@ -334,13 +342,14 @@ async function checkRouteTime(routeId: number): Promise<{ route: any; history: a
     }
 
     const settings = await storage.getSettings();
-    if (!settings?.apiKey) {
+    const apiKey = process.env.GOOGLE_MAPS_API_KEY || settings?.apiKey;
+    if (!apiKey) {
       console.error(`Cannot check route ${routeId}: API key not configured`);
       return null;
     }
 
     // Call Google Maps API to get travel time
-    const travelTimeResult = await getTravelTime(route.source, route.destination, settings.apiKey);
+    const travelTimeResult = await getTravelTime(route.source, route.destination, apiKey);
     if (!travelTimeResult) {
       console.error(`Failed to get travel time for route ${routeId}`);
       return null;
