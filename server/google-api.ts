@@ -15,6 +15,12 @@ const distanceMatrixResponseSchema = z.object({
               text: z.string(),
             })
             .optional(),
+          duration_in_traffic: z
+            .object({
+              value: z.number(),
+              text: z.string(),
+            })
+            .optional(),
           distance: z
             .object({
               value: z.number(),
@@ -43,10 +49,15 @@ export async function getTravelTime(
       origins: origin,
       destinations: destination,
       mode: 'driving',
+      traffic_model: 'best_guess',
+      departure_time: Math.floor(Date.now() / 1000).toString(), // Current timestamp
       key: apiKey,
     };
 
     const response = await axios.get(url, { params });
+    
+    // Log the response to debug traffic data
+    console.log('Google Maps API Response:', JSON.stringify(response.data, null, 2));
 
     // Validate the response with Zod
     const validatedResponse = distanceMatrixResponseSchema.parse(response.data);
@@ -62,17 +73,24 @@ export async function getTravelTime(
     }
 
     const element = validatedResponse.rows[0].elements[0];
-    if (!element.duration || !element.distance) {
-      console.error('Missing duration or distance in response:', element);
+    if (!element.distance) {
+      console.error('Missing distance in response:', element);
+      return null;
+    }
+
+    // Use duration_in_traffic for real-time traffic data, fallback to duration
+    const durationData = element.duration_in_traffic || element.duration;
+    if (!durationData) {
+      console.error('Missing duration data in response:', element);
       return null;
     }
 
     // Convert duration from seconds to minutes and round
-    const durationMinutes = Math.round(element.duration.value / 60);
+    const durationMinutes = Math.round(durationData.value / 60);
 
     return {
       durationMinutes,
-      durationText: element.duration.text,
+      durationText: durationData.text,
       distanceText: element.distance.text,
     };
   } catch (error) {
