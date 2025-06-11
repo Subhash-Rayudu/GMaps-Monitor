@@ -2,6 +2,7 @@ import { Link, useLocation } from "wouter";
 import { useState, useEffect } from "react";
 import { ApiKeyModal } from "./api-key-modal";
 import { useQuery } from "@tanstack/react-query";
+import { Setting } from "@shared/schema";
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -12,13 +13,13 @@ export default function Layout({ children }: LayoutProps) {
   const [isApiKeyModalOpen, setIsApiKeyModalOpen] = useState(false);
   
   // Get settings to check if API key is configured
-  const { data: settings } = useQuery({
+  const { data: settings } = useQuery<Setting>({
     queryKey: ['/api/settings'],
   });
   
   // Automatically show API key modal if API key is not configured
   useEffect(() => {
-    if (settings && !settings.apiKey) {
+    if (settings && !settings?.apiKey) {
       setIsApiKeyModalOpen(true);
     }
   }, [settings]);
@@ -56,20 +57,14 @@ export default function Layout({ children }: LayoutProps) {
       <main className="container mx-auto px-4 py-6 flex-grow">
         {/* Tabs Navigation */}
         <div className="flex border-b border-neutral-200 mb-6">
-          <Link href="/">
-            <a className={getTabClass("/")}>
-              Monitor
-            </a>
+          <Link href="/" className={getTabClass("/")}>
+            Monitor
           </Link>
-          <Link href="/saved-routes">
-            <a className={getTabClass("/saved-routes")}>
-              Saved Routes
-            </a>
+          <Link href="/saved-routes" className={getTabClass("/saved-routes")}>
+            Saved Routes
           </Link>
-          <Link href="/settings">
-            <a className={getTabClass("/settings")}>
-              Settings
-            </a>
+          <Link href="/settings" className={getTabClass("/settings")}>
+            Settings
           </Link>
         </div>
 

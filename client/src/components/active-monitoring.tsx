@@ -3,15 +3,19 @@ import { Button } from "@/components/ui/button";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { Route } from "@shared/schema";
+import { Route, Notification as NotificationData } from "@shared/schema";
 import { Skeleton } from "@/components/ui/skeleton";
 import { RouteChart } from "./route-chart";
 import { formatDuration, formatTimeChange, getTimeChangeColorClass, getTimeChangeIcon, formatRelativeTime } from "@/lib/google-maps";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { useNotification } from "@/hooks/use-notification";
+import { useEffect, useRef } from "react";
 
 export function ActiveMonitoring() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { permission, requestPermission, showNotification, isSupported } = useNotification();
+  const lastNotificationIdsRef = useRef<Set<number>>(new Set());
 
   // Query to fetch active routes with auto-refresh
   const { data: routes, isLoading, error } = useQuery<Route[]>({
@@ -19,6 +23,47 @@ export function ActiveMonitoring() {
     refetchInterval: 10000, // Refresh every 10 seconds
     refetchOnWindowFocus: true, // Refresh when window regains focus
   });
+
+  // Query to fetch notifications for device notifications
+  const { data: notifications } = useQuery<NotificationData[]>({
+    queryKey: ['/api/notifications'],
+    refetchInterval: 10000, // Refresh every 10 seconds
+    refetchOnWindowFocus: true,
+  });
+
+  // Request notification permission on mount if supported
+  useEffect(() => {
+    if (isSupported && permission === 'default') {
+      requestPermission();
+    }
+  }, [isSupported, permission, requestPermission]);
+
+  // Handle device notifications for travel time decreases
+  useEffect(() => {
+    if (!notifications || !isSupported || permission !== 'granted') {
+      return;
+    }
+
+    const newNotifications = notifications.filter(n => 
+      !lastNotificationIdsRef.current.has(n.id) && 
+      n.type === 'decrease'
+    );
+
+    newNotifications.forEach(notification => {
+      showNotification('Travel Time Decreased! 🚀', {
+        body: notification.message,
+        icon: '/favicon.ico',
+        tag: `route-${notification.routeId}`,
+        requireInteraction: false,
+        silent: false,
+      });
+
+      lastNotificationIdsRef.current.add(notification.id);
+    });
+
+    // Keep track of all current notification IDs
+    notifications.forEach(n => lastNotificationIdsRef.current.add(n.id));
+  }, [notifications, isSupported, permission, showNotification]);
 
   // Mutation to stop monitoring a route
   const stopMonitoringMutation = useMutation({
@@ -95,7 +140,43 @@ export function ActiveMonitoring() {
 
   return (
     <div className="mb-8">
-      <h2 className="text-lg font-medium text-neutral-800 mb-4">Active Monitoring</h2>
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-lg font-medium text-neutral-800">Active Monitoring</h2>
+        
+        {/* Notification permission button */}
+        {isSupported && permission !== 'granted' && (
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={async () => {
+              const result = await requestPermission();
+              if (result === 'granted') {
+                toast({
+                  title: "Notifications Enabled",
+                  description: "You will now receive browser notifications for travel time changes.",
+                });
+              } else if (result === 'denied') {
+                toast({
+                  title: "Notifications Blocked",
+                  description: "Please enable notifications in your browser settings to receive alerts.",
+                  variant: "destructive",
+                });
+              }
+            }}
+            className="flex items-center space-x-2"
+          >
+            <span className="material-icons text-sm">notifications</span>
+            <span>Enable Notifications</span>
+          </Button>
+        )}
+        
+        {isSupported && permission === 'granted' && (
+          <div className="flex items-center space-x-2 text-sm text-green-600">
+            <span className="material-icons text-sm">notifications_active</span>
+            <span>Device notifications enabled</span>
+          </div>
+        )}
+      </div>
       
       {/* Empty state */}
       {(!routes || routes.length === 0) && (

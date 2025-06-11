@@ -39,10 +39,30 @@ export function RouteChart({ routeId }: RouteChartProps) {
       (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
     );
 
-    // Prepare data for chart
-    const labels = sortedHistory.map((item) => {
+    // Prepare data for chart with unique timestamps  
+    const labels = sortedHistory.map((item, index) => {
       const date = new Date(item.timestamp);
-      return `${date.getHours()}:${date.getMinutes().toString().padStart(2, '0')}`;
+      const hours = date.getHours();
+      const minutes = date.getMinutes();
+      const seconds = date.getSeconds();
+      
+      // Create base time string
+      const timeString = `${hours}:${minutes.toString().padStart(2, '0')}`;
+      
+      // Check for duplicates in the current array up to this point
+      const previousLabels = sortedHistory.slice(0, index).map(h => {
+        const d = new Date(h.timestamp);
+        return `${d.getHours()}:${d.getMinutes().toString().padStart(2, '0')}`;
+      });
+      
+      const hasDuplicate = previousLabels.includes(timeString);
+      
+      if (hasDuplicate) {
+        // Show seconds for duplicates
+        return `${timeString}:${seconds.toString().padStart(2, '0')}`;
+      } else {
+        return timeString;
+      }
     });
 
     const travelTimes = sortedHistory.map((item) => item.travelTime);
