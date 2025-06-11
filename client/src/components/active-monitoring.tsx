@@ -50,11 +50,11 @@ export function ActiveMonitoring() {
     );
 
     newNotifications.forEach(notification => {
-      showNotification('Travel Time Decreased! 🚀', {
+      showNotification('Traffic Alert: Faster Route Available!', {
         body: notification.message,
         icon: '/favicon.ico',
         tag: `route-${notification.routeId}`,
-        requireInteraction: false,
+        requireInteraction: true, // Keep notification until user clicks
         silent: false,
       });
 
@@ -266,21 +266,21 @@ export function ActiveMonitoring() {
               <div className="flex justify-between">
                 <div>
                   <div className="text-xs text-muted-foreground">Minimum</div>
-                  <div className="flex items-center text-accent">
+                  <div className="flex items-center text-green-600 dark:text-green-400">
                     <span className="text-lg font-bold">{route.minTime || '-'}</span>
                     <span className="ml-1 text-sm">min</span>
                   </div>
                 </div>
                 <div>
                   <div className="text-xs text-muted-foreground">Maximum</div>
-                  <div className="flex items-center text-destructive">
+                  <div className="flex items-center text-red-600 dark:text-red-400">
                     <span className="text-lg font-bold">{route.maxTime || '-'}</span>
                     <span className="ml-1 text-sm">min</span>
                   </div>
                 </div>
                 <div>
                   <div className="text-xs text-muted-foreground">Average</div>
-                  <div className="flex items-center text-primary">
+                  <div className="flex items-center text-blue-600 dark:text-blue-400">
                     <span className="text-lg font-bold">{route.avgTime || '-'}</span>
                     <span className="ml-1 text-sm">min</span>
                   </div>

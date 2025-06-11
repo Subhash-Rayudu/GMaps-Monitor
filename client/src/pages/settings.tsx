@@ -251,15 +251,37 @@ export default function Settings() {
                   control={form.control}
                   name="enableNotifications"
                   render={({ field }) => (
-                    <FormItem className="flex items-center justify-between">
-                      <FormLabel>Enable Browser Notifications</FormLabel>
-                      <FormControl>
-                        <Switch
-                          checked={field.value}
-                          onCheckedChange={field.onChange}
-                          disabled={!isSupported}
-                        />
-                      </FormControl>
+                    <FormItem className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <FormLabel>Enable Browser Notifications</FormLabel>
+                        <FormControl>
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                            disabled={!isSupported}
+                          />
+                        </FormControl>
+                      </div>
+                      <div className="text-sm space-y-1">
+                        {!isSupported && (
+                          <p className="text-destructive">Browser notifications are not supported on this device.</p>
+                        )}
+                        {isSupported && permission === 'denied' && (
+                          <p className="text-destructive">
+                            Notification permission was denied. Please allow notifications in your browser settings to receive alerts.
+                          </p>
+                        )}
+                        {isSupported && permission === 'default' && (
+                          <p className="text-muted-foreground">
+                            Click to enable notifications and you'll be prompted to allow them.
+                          </p>
+                        )}
+                        {isSupported && permission === 'granted' && (
+                          <p className="text-green-600">
+                            ✓ Notifications are enabled and will work even when this tab is in the background.
+                          </p>
+                        )}
+                      </div>
                     </FormItem>
                   )}
                 />

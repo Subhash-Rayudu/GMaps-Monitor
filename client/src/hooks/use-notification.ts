@@ -42,6 +42,7 @@ export function useNotification(): UseNotificationResult {
   // Show notification
   const showNotification = useCallback((title: string, options?: NotificationOptions) => {
     if (!isSupported || permission !== 'granted') {
+      console.warn('Notifications not supported or permission not granted');
       return;
     }
 
@@ -49,14 +50,22 @@ export function useNotification(): UseNotificationResult {
       const notification = new Notification(title, {
         icon: '/favicon.ico',
         badge: '/favicon.ico',
+        requireInteraction: true, // Keep notification until user interacts
+        silent: false, // Enable sound
         ...options,
       });
 
-      // Auto close after 5 seconds if not specified
-      if (!options?.tag) {
+      // Handle notification click to focus the tab
+      notification.onclick = () => {
+        window.focus();
+        notification.close();
+      };
+
+      // Only auto-close after 10 seconds if not requiring interaction
+      if (!options?.requireInteraction) {
         setTimeout(() => {
           notification.close();
-        }, 5000);
+        }, 10000);
       }
 
       return notification;
