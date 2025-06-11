@@ -85,15 +85,15 @@ export function NotificationHistory() {
   const getNotificationIcon = (type: string) => {
     switch (type) {
       case 'increase':
-        return <span className="material-icons text-destructive mt-0.5 mr-2">arrow_upward</span>;
+        return <span className="material-icons text-red-600 dark:text-red-400 mt-0.5 mr-2">arrow_upward</span>;
       case 'decrease':
-        return <span className="material-icons text-accent mt-0.5 mr-2">arrow_downward</span>;
+        return <span className="material-icons text-green-600 dark:text-green-400 mt-0.5 mr-2">arrow_downward</span>;
       case 'new':
-        return <span className="material-icons text-primary mt-0.5 mr-2">add_circle</span>;
+        return <span className="material-icons text-blue-600 dark:text-blue-400 mt-0.5 mr-2">add_circle</span>;
       case 'unchanged':
-        return <span className="material-icons text-primary mt-0.5 mr-2">schedule</span>;
+        return <span className="material-icons text-gray-600 dark:text-gray-400 mt-0.5 mr-2">schedule</span>;
       default:
-        return <span className="material-icons text-primary mt-0.5 mr-2">notifications</span>;
+        return <span className="material-icons text-blue-600 dark:text-blue-400 mt-0.5 mr-2">notifications</span>;
     }
   };
 
