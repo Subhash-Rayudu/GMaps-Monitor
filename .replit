@@ -16,7 +16,6 @@ externalPort = 80
 exposeLocalhost = true
 
 [workflows]
-runButton = "Project"
 
 [[workflows.workflow]]
 name = "Project"

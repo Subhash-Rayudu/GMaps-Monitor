@@ -63,6 +63,7 @@ export function RouteForm() {
       });
       
       form.reset(defaultValues);
+      setIntervalDisplay("5 min"); // Reset slider display to match default value
     },
     onError: (error) => {
       console.error("Failed to add route:", error);
