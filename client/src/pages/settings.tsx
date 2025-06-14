@@ -7,7 +7,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Setting } from "@shared/schema";
 import { Card, CardContent } from "@/components/ui/card";
-import { Form, FormControl, FormField, FormItem, FormLabel } from "@/components/ui/form";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormDescription } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -23,6 +23,7 @@ const settingsFormSchema = z.object({
   enableNotifications: z.boolean().default(true),
   notificationType: z.enum(["all", "significant", "increase"]),
   historyRetention: z.string(),
+  storageLocation: z.enum(["server", "browser"]).default("server"),
 });
 
 type SettingsFormValues = z.infer<typeof settingsFormSchema>;
@@ -46,12 +47,14 @@ export default function Settings() {
       enableNotifications: settings?.enableNotifications ?? true,
       notificationType: settings?.notificationType as "all" | "significant" | "increase" || "all",
       historyRetention: settings?.historyRetention?.toString() || "30",
+      storageLocation: settings?.storageLocation as "server" | "browser" || "server",
     },
     values: settings ? {
       apiKey: settings.apiKey || "",
       enableNotifications: settings.enableNotifications,
       notificationType: settings.notificationType as "all" | "significant" | "increase",
       historyRetention: settings.historyRetention?.toString() || "30",
+      storageLocation: settings.storageLocation as "server" | "browser" || "server",
     } : undefined,
   });
 
@@ -128,6 +131,7 @@ export default function Settings() {
   const onSubmitDataSettings = (values: Partial<SettingsFormValues>) => {
     updateSettingsMutation.mutate({
       historyRetention: values.historyRetention,
+      storageLocation: values.storageLocation,
     });
   };
 
@@ -335,6 +339,34 @@ export default function Settings() {
           <div className="bg-neutral-100 rounded-lg p-4">
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmitDataSettings)} className="space-y-4">
+                <FormField
+                  control={form.control}
+                  name="storageLocation"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Storage Location</FormLabel>
+                      <Select 
+                        value={field.value} 
+                        onValueChange={field.onChange}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select storage location" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="server">Server Storage</SelectItem>
+                          <SelectItem value="browser">Browser Storage (Private)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormDescription>
+                        Browser storage keeps your route history private and local to your device, 
+                        while server storage allows access from any device but uses server resources.
+                      </FormDescription>
+                    </FormItem>
+                  )}
+                />
+                
                 <FormField
                   control={form.control}
                   name="historyRetention"

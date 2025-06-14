@@ -105,4 +105,5 @@ export const routeFormSchema = insertRouteSchema.extend({
 
 export const settingsFormSchema = insertSettingsSchema.extend({
   apiKey: z.string().min(1, "API key is required"),
+  storageLocation: z.enum(["server", "browser"]).default("server"),
 });

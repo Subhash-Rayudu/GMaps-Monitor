@@ -229,7 +229,7 @@ export class MemStorage implements IStorage {
     } else {
       this.settings = { ...this.settings, ...updates };
     }
-    return this.settings;
+    return this.settings!;
   }
 }
 
