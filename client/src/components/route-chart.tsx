@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { RouteHistory } from "@shared/schema";
 import Chart from "chart.js/auto";
 import { Skeleton } from "@/components/ui/skeleton";
+import { browserHistoryStorage } from "@/lib/browser-storage";
 
 interface RouteChartProps {
   routeId: number;
@@ -12,13 +13,59 @@ export function RouteChart({ routeId }: RouteChartProps) {
   const chartRef = useRef<HTMLCanvasElement>(null);
   const chartInstance = useRef<Chart<"line", any, unknown> | null>(null);
   const [isClient, setIsClient] = useState(false);
+  const [browserHistory, setBrowserHistory] = useState<RouteHistory[]>([]);
 
-  // Get route history data with auto-refresh
-  const { data: history, isLoading, error } = useQuery<RouteHistory[]>({
+  // Get settings to check storage preference
+  const { data: settings } = useQuery({
+    queryKey: ['/api/settings'],
+  });
+
+  const usingBrowserStorage = settings?.storageLocation === 'browser';
+
+  // Get route history data with auto-refresh (only for server storage)
+  const { data: serverHistory, isLoading, error } = useQuery<RouteHistory[]>({
     queryKey: [`/api/routes/${routeId}/history`],
     refetchInterval: 30000, // Refresh every 30 seconds
     refetchOnWindowFocus: true, // Refresh when window regains focus
+    enabled: !usingBrowserStorage, // Only fetch from server if not using browser storage
   });
+
+  // For browser storage, load data from localStorage and set up polling
+  useEffect(() => {
+    if (!usingBrowserStorage) return;
+
+    const loadBrowserHistory = () => {
+      const history = browserHistoryStorage.getRouteHistories(routeId);
+      setBrowserHistory(history);
+    };
+
+    // Load initial data
+    loadBrowserHistory();
+
+    // Poll for new data and add to browser storage
+    const pollInterval = setInterval(async () => {
+      try {
+        const response = await fetch(`/api/routes/${routeId}/current-data`);
+        if (response.ok) {
+          const data = await response.json();
+          const newHistory = browserHistoryStorage.addRouteHistory(routeId, {
+            routeId: data.routeId,
+            travelTime: data.travelTime,
+            change: data.change,
+            timestamp: new Date(data.timestamp),
+          });
+          loadBrowserHistory(); // Refresh the display
+        }
+      } catch (error) {
+        console.error('Failed to fetch current route data:', error);
+      }
+    }, 30000); // Poll every 30 seconds
+
+    return () => clearInterval(pollInterval);
+  }, [routeId, usingBrowserStorage]);
+
+  // Use appropriate history source
+  const history = usingBrowserStorage ? browserHistory : serverHistory;
 
   // Set isClient to true on mount to avoid SSR issues
   useEffect(() => {

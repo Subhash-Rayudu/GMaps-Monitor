@@ -203,6 +203,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid route ID" });
       }
 
+      // Check storage preference
+      const settings = await storage.getSettings();
+      
+      // If browser storage is selected, return empty array (client will handle browser storage)
+      if (settings && settings.storageLocation === "browser") {
+        return res.json([]);
+      }
+
       const history = await storage.getRouteHistories(routeId);
       return res.json(history);
     } catch (error) {
@@ -227,6 +235,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error(`Error checking route ${req.params.id}:`, error);
       return res.status(500).json({ message: "Failed to check route" });
+    }
+  });
+
+  // Browser storage endpoint - provides real-time data for client-side storage
+  app.get("/api/routes/:id/current-data", async (req, res) => {
+    try {
+      const routeId = parseInt(req.params.id);
+      if (isNaN(routeId)) {
+        return res.status(400).json({ message: "Invalid route ID" });
+      }
+
+      const route = await storage.getRoute(routeId);
+      if (!route) {
+        return res.status(404).json({ message: "Route not found" });
+      }
+
+      const settings = await storage.getSettings();
+      const apiKey = process.env.GOOGLE_MAPS_API_KEY || settings?.apiKey;
+      if (!apiKey) {
+        return res.status(500).json({ message: "API key not configured" });
+      }
+
+      // Get current travel time from Google Maps
+      const travelTimeResult = await getTravelTime(route.source, route.destination, apiKey);
+      if (!travelTimeResult) {
+        return res.status(500).json({ message: "Failed to get travel time" });
+      }
+
+      const { durationMinutes } = travelTimeResult;
+      const previousTime = route.currentTime;
+      const timeChange = previousTime !== null ? durationMinutes - previousTime : null;
+
+      return res.json({
+        routeId,
+        travelTime: durationMinutes,
+        change: timeChange,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      console.error(`Error getting current data for route ${req.params.id}:`, error);
+      return res.status(500).json({ message: "Failed to get current route data" });
     }
   });
 
@@ -341,8 +390,8 @@ async function checkRouteTime(routeId: number): Promise<{ route: any; history: a
       return null;
     }
 
-    const settings = await storage.getSettings();
-    const apiKey = process.env.GOOGLE_MAPS_API_KEY || settings?.apiKey;
+    const appSettings = await storage.getSettings();
+    const apiKey = process.env.GOOGLE_MAPS_API_KEY || appSettings?.apiKey;
     if (!apiKey) {
       console.error(`Cannot check route ${routeId}: API key not configured`);
       return null;
@@ -361,22 +410,33 @@ async function checkRouteTime(routeId: number): Promise<{ route: any; history: a
     const previousTime = route.currentTime;
     const timeChange = previousTime !== null ? durationMinutes - previousTime : null;
     
-    // Create route history entry
-    const history = await storage.createRouteHistory({
-      routeId,
-      travelTime: durationMinutes,
-      timestamp: new Date(),
-      change: timeChange,
-    });
+    // Check storage preference before creating history entry
+    const storageSettings = await storage.getSettings();
+    let history = null;
+    
+    // Only create server history if storage location is "server"
+    if (!storageSettings || storageSettings.storageLocation === "server") {
+      history = await storage.createRouteHistory({
+        routeId,
+        travelTime: durationMinutes,
+        timestamp: new Date(),
+        change: timeChange,
+      });
+    }
 
     // Update route with new travel time and min/max/avg
     const minTime = route.minTime ? Math.min(route.minTime, durationMinutes) : durationMinutes;
     const maxTime = route.maxTime ? Math.max(route.maxTime, durationMinutes) : durationMinutes;
     
-    // Calculate average from all histories
-    const allHistories = await storage.getRouteHistories(routeId);
-    const sum = allHistories.reduce((acc, h) => acc + h.travelTime, 0);
-    const avgTime = Math.round(sum / allHistories.length);
+    // Calculate average from all histories (only if using server storage)
+    let avgTime = durationMinutes;
+    if (!storageSettings || storageSettings.storageLocation === "server") {
+      const allHistories = await storage.getRouteHistories(routeId);
+      if (allHistories.length > 0) {
+        const sum = allHistories.reduce((acc, h) => acc + h.travelTime, 0);
+        avgTime = Math.round(sum / allHistories.length);
+      }
+    }
     
     // Update route with new information
     const updatedRoute = await storage.updateRoute(routeId, {
@@ -411,8 +471,8 @@ async function checkRouteTime(routeId: number): Promise<{ route: any; history: a
       // Check notification preferences
       let shouldNotify = false;
       
-      if (settings.enableNotifications) {
-        switch (settings.notificationType) {
+      if (appSettings && appSettings.enableNotifications) {
+        switch (appSettings.notificationType) {
           case "all":
             shouldNotify = true;
             break;
