@@ -72,6 +72,7 @@ export const settings = pgTable("settings", {
   enableNotifications: boolean("enable_notifications").notNull().default(true),
   notificationType: text("notification_type").notNull().default("all"), // 'all', 'significant', 'increase'
   historyRetention: integer("history_retention").notNull().default(30), // in days
+  storageLocation: text("storage_location").notNull().default("server"), // 'server', 'browser'
 });
 
 export const insertSettingsSchema = createInsertSchema(settings).omit({

@@ -207,6 +207,7 @@ export class MemStorage implements IStorage {
         enableNotifications: updates.enableNotifications ?? true,
         notificationType: updates.notificationType ?? "all",
         historyRetention: updates.historyRetention ?? 30,
+        storageLocation: updates.storageLocation ?? "server",
       };
     } else {
       this.settings = { ...this.settings, ...updates };
