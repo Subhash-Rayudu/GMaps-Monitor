@@ -53,10 +53,11 @@ class BrowserHistoryStorage {
     // Generate a unique ID based on timestamp and random
     const id = Date.now() + Math.floor(Math.random() * 1000);
     const newHistory: RouteHistory = {
-      ...history,
       id,
       routeId,
       timestamp: new Date(),
+      travelTime: history.travelTime,
+      change: history.change ?? null,
     };
 
     data.histories[routeId].unshift(newHistory);

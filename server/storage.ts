@@ -64,10 +64,11 @@ export class MemStorage implements IStorage {
     // Create default settings
     this.settings = {
       id: 1,
-      apiKey: process.env.GOOGLE_MAPS_API_KEY,
+      apiKey: process.env.GOOGLE_MAPS_API_KEY || null,
       enableNotifications: true,
       notificationType: "all",
       historyRetention: 30,
+      storageLocation: "server",
     };
   }
 
@@ -110,10 +111,21 @@ export class MemStorage implements IStorage {
     const id = this.routeId++;
     const now = new Date();
     const route: Route = { 
-      ...insertRoute, 
-      id, 
+      id,
+      name: insertRoute.name,
+      source: insertRoute.source,
+      destination: insertRoute.destination,
+      interval: insertRoute.interval ?? 15,
+      isActive: insertRoute.isActive ?? false,
+      isSaved: insertRoute.isSaved ?? false,
       lastChecked: now,
-      change: null, // Initialize change as null
+      currentTime: null,
+      minTime: null,
+      maxTime: null,
+      avgTime: null,
+      change: null,
+      sourceDetails: insertRoute.sourceDetails ?? null,
+      destinationDetails: insertRoute.destinationDetails ?? null,
     };
     this.routes.set(id, route);
     return route;
@@ -145,9 +157,11 @@ export class MemStorage implements IStorage {
   async createRouteHistory(insertHistory: InsertRouteHistory): Promise<RouteHistory> {
     const id = this.routeHistoryId++;
     const history: RouteHistory = { 
-      ...insertHistory, 
       id,
-      timestamp: insertHistory.timestamp || new Date()
+      routeId: insertHistory.routeId,
+      timestamp: insertHistory.timestamp || new Date(),
+      travelTime: insertHistory.travelTime,
+      change: insertHistory.change ?? null,
     };
     this.routeHistories.set(id, history);
     return history;
@@ -155,7 +169,7 @@ export class MemStorage implements IStorage {
 
   async deleteRouteHistories(routeId: number): Promise<boolean> {
     let success = true;
-    for (const [id, history] of this.routeHistories.entries()) {
+    for (const [id, history] of Array.from(this.routeHistories.entries())) {
       if (history.routeId === routeId) {
         success = this.routeHistories.delete(id) && success;
       }
@@ -172,9 +186,12 @@ export class MemStorage implements IStorage {
   async createNotification(insertNotification: InsertNotification): Promise<Notification> {
     const id = this.notificationId++;
     const notification: Notification = { 
-      ...insertNotification, 
       id,
-      timestamp: insertNotification.timestamp || new Date()
+      routeId: insertNotification.routeId,
+      timestamp: insertNotification.timestamp || new Date(),
+      type: insertNotification.type,
+      message: insertNotification.message,
+      isRead: insertNotification.isRead ?? false,
     };
     this.notifications.set(id, notification);
     return notification;
@@ -203,7 +220,7 @@ export class MemStorage implements IStorage {
     if (!this.settings) {
       this.settings = {
         id: 1,
-        ...updates,
+        apiKey: updates.apiKey ?? null,
         enableNotifications: updates.enableNotifications ?? true,
         notificationType: updates.notificationType ?? "all",
         historyRetention: updates.historyRetention ?? 30,
