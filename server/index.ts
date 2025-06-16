@@ -1,8 +1,14 @@
 import express, { type Request, Response, NextFunction } from "express";
+import morgan from "morgan";
 import { registerRoutes } from "./routes";
-import { setupVite, serveStatic, log } from "./vite";
+import { setupVite, serveStatic } from "./vite";
+import logger, { morganStream } from "./logger";
 
 const app = express();
+
+// Enhanced HTTP request logging with Morgan
+app.use(morgan('combined', { stream: morganStream }));
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
@@ -29,7 +35,7 @@ app.use((req, res, next) => {
         logLine = logLine.slice(0, 79) + "…";
       }
 
-      log(logLine);
+      logger.http(logLine);
     }
   });
 
@@ -43,8 +49,14 @@ app.use((req, res, next) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
 
+    logger.error(`Error ${status}: ${message}`, {
+      stack: err.stack,
+      url: _req.url,
+      method: _req.method,
+      ip: _req.ip
+    });
+
     res.status(status).json({ message });
-    throw err;
   });
 
   // importantly only setup vite in development and after
@@ -65,6 +77,6 @@ app.use((req, res, next) => {
     host: "127.0.0.1",
     reusePort: true,
   }, () => {
-    log(`serving on port ${port}`);
+    logger.info(`serving on port ${port}`);
   });
 })();

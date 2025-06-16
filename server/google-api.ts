@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { z } from 'zod';
+import logger from './logger';
 
 // Google Maps Distance Matrix API response schema
 const distanceMatrixResponseSchema = z.object({
@@ -43,7 +44,14 @@ export async function getTravelTime(
   destination: string,
   apiKey: string
 ): Promise<{ durationMinutes: number; durationText: string; distanceText: string } | null> {
+  const startTime = Date.now();
   try {
+    logger.debug("Requesting Google Maps travel time", {
+      service: "google-api",
+      origin: origin.substring(0, 50) + "...",
+      destination: destination.substring(0, 50) + "..."
+    });
+    
     const url = `https://maps.googleapis.com/maps/api/distancematrix/json`;
     const params = {
       origins: origin,
@@ -56,8 +64,12 @@ export async function getTravelTime(
 
     const response = await axios.get(url, { params });
     
-    // Log the response to debug traffic data
-    console.log('Google Maps API Response:', JSON.stringify(response.data, null, 2));
+    // Log API response for debugging
+    logger.debug("Google Maps API response received", {
+      service: "google-api",
+      status: response.data.status,
+      duration: Date.now() - startTime
+    });
 
     // Validate the response with Zod
     const validatedResponse = distanceMatrixResponseSchema.parse(response.data);
@@ -68,33 +80,59 @@ export async function getTravelTime(
       !validatedResponse.rows[0].elements.length ||
       validatedResponse.rows[0].elements[0].status !== 'OK'
     ) {
-      console.error('Invalid response from Google Maps API:', response.data);
+      logger.error('Invalid Google Maps API response', {
+        service: "google-api",
+        apiStatus: validatedResponse.status,
+        elementStatus: validatedResponse.rows[0]?.elements[0]?.status,
+        duration: Date.now() - startTime
+      });
       return null;
     }
 
     const element = validatedResponse.rows[0].elements[0];
     if (!element.distance) {
-      console.error('Missing distance in response:', element);
+      logger.error('Missing distance data in Google Maps response', {
+        service: "google-api",
+        element: JSON.stringify(element),
+        duration: Date.now() - startTime
+      });
       return null;
     }
 
     // Use duration_in_traffic for real-time traffic data, fallback to duration
     const durationData = element.duration_in_traffic || element.duration;
     if (!durationData) {
-      console.error('Missing duration data in response:', element);
+      logger.error('Missing duration data in Google Maps response', {
+        service: "google-api",
+        element: JSON.stringify(element),
+        duration: Date.now() - startTime
+      });
       return null;
     }
 
     // Convert duration from seconds to minutes and round
     const durationMinutes = Math.round(durationData.value / 60);
 
+    logger.info("Travel time retrieved successfully", {
+      service: "google-api",
+      durationMinutes: durationMinutes,
+      durationText: durationData.text,
+      distanceText: element.distance.text,
+      hasTrafficData: !!element.duration_in_traffic,
+      duration: Date.now() - startTime
+    });
+
     return {
       durationMinutes,
       durationText: durationData.text,
       distanceText: element.distance.text,
     };
-  } catch (error) {
-    console.error('Error fetching travel time:', error);
+  } catch (error: any) {
+    logger.error('Failed to fetch travel time from Google Maps', {
+      service: "google-api",
+      error: error?.message || "Unknown error",
+      duration: Date.now() - startTime
+    });
     return null;
   }
 }
