@@ -5,6 +5,7 @@ import { insertRouteSchema, insertSettingsSchema } from "@shared/schema";
 import { getTravelTime } from "./google-api";
 import { ZodError } from "zod";
 import schedule from "node-schedule";
+import logger from "./logger";
 
 // Map to store scheduled jobs
 const scheduledJobs: Map<number, schedule.Job> = new Map();
@@ -35,8 +36,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         apiKeyConfigured: !!apiKey,
         activeRoutesCount: activeRoutes.length,
       });
-    } catch (error) {
-      console.error("Error initializing app:", error);
+    } catch (error: any) {
+      logger.error("Application initialization failed", {
+        service: "init",
+        error: error?.message || "Unknown error",
+        stack: error?.stack
+      });
       return res.status(500).json({ message: "Failed to initialize app" });
     }
   });
@@ -46,18 +51,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const routes = await storage.getRoutes();
       return res.json(routes);
-    } catch (error) {
-      console.error("Error fetching routes:", error);
+    } catch (error: any) {
+      logger.error("Failed to fetch routes", {
+        service: "routes",
+        error: error?.message || "Unknown error"
+      });
       return res.status(500).json({ message: "Failed to fetch routes" });
     }
   });
 
   app.get("/api/routes/active", async (_req, res) => {
+    const startTime = Date.now();
     try {
+      logger.debug("Fetching active routes", { service: "routes" });
       const routes = await storage.getActiveRoutes();
+      
+      logger.info("Active routes fetched successfully", {
+        service: "routes",
+        count: routes.length,
+        duration: Date.now() - startTime
+      });
+      
       return res.json(routes);
-    } catch (error) {
-      console.error("Error fetching active routes:", error);
+    } catch (error: any) {
+      logger.error("Failed to fetch active routes", {
+        service: "routes",
+        error: error?.message || "Unknown error",
+        duration: Date.now() - startTime
+      });
       return res.status(500).json({ message: "Failed to fetch active routes" });
     }
   });
@@ -163,7 +184,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       return res.json(updatedRoute);
     } catch (error) {
-      console.error(`Error updating route ${req.params.id}:`, error);
+      logger.error(`Error updating route ${req.params.id}:`, error);
       return res.status(500).json({ message: "Failed to update route" });
     }
   });
@@ -190,7 +211,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       return res.status(204).send();
     } catch (error) {
-      console.error(`Error deleting route ${req.params.id}:`, error);
+      logger.error(`Error deleting route ${req.params.id}:`, error);
       return res.status(500).json({ message: "Failed to delete route" });
     }
   });
@@ -376,9 +397,9 @@ function scheduleRouteMonitoring(routeId: number): void {
     });
 
     scheduledJobs.set(routeId, job);
-    console.log(`Scheduled monitoring for route ${routeId} every ${route.interval} minutes`);
+    logger.info(`Scheduled monitoring for route ${routeId} every ${route.interval} minutes`);
   }).catch(error => {
-    console.error(`Error scheduling monitoring for route ${routeId}:`, error);
+    logger.error(`Error scheduling monitoring for route ${routeId}:`, error);
   });
 }
 
@@ -393,14 +414,14 @@ async function checkRouteTime(routeId: number): Promise<{ route: any; history: a
     const appSettings = await storage.getSettings();
     const apiKey = process.env.GOOGLE_MAPS_API_KEY || appSettings?.apiKey;
     if (!apiKey) {
-      console.error(`Cannot check route ${routeId}: API key not configured`);
+      logger.error(`Cannot check route ${routeId}: API key not configured`);
       return null;
     }
 
     // Call Google Maps API to get travel time
     const travelTimeResult = await getTravelTime(route.source, route.destination, apiKey);
     if (!travelTimeResult) {
-      console.error(`Failed to get travel time for route ${routeId}`);
+      logger.error(`Failed to get travel time for route ${routeId}`);
       return null;
     }
 
@@ -493,6 +514,12 @@ async function checkRouteTime(routeId: number): Promise<{ route: any; history: a
           timestamp: new Date(),
           isRead: false,
         });
+        logger.info("Route monitoring notification created", {
+        service: "monitoring",
+        routeId: routeId,
+        notificationType: notificationType,
+        message: message.substring(0, 100) // Truncate for log readability
+      });
       }
     } else {
       // This is the first check for this route
@@ -512,7 +539,7 @@ async function checkRouteTime(routeId: number): Promise<{ route: any; history: a
       notification,
     };
   } catch (error) {
-    console.error(`Error checking route ${routeId}:`, error);
+    logger.error(`Error checking route ${routeId}:`, error);
     return null;
   }
 }
